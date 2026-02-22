@@ -1,65 +1,213 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useEffect, useMemo, useState } from "react"
+import { analytics } from "@/app/data/analytics"
+
+/* ------------------ TYPES ------------------ */
+type TopRestaurant = {
+  id: number
+  name: string
+  revenue: number
+  peakHour: number
+}
+
+const PAGE_SIZE = 6
+
+/* ------------------ DASHBOARD ------------------ */
+export default function Dashboard() {
+  const [search, setSearch] = useState("")
+  const [sortBy, setSortBy] = useState<"revenue" | "name">("revenue")
+  const [hourRange, setHourRange] = useState<[number, number]>([0, 23])
+  const [amountRange, setAmountRange] = useState<[number, number]>([0, 100000])
+  const [page, setPage] = useState(1)
+
+  /* ------------------ FILTER + SORT ------------------ */
+  const filteredRestaurants = useMemo(() => {
+    let data: TopRestaurant[] = [...analytics.topRestaurants]
+
+    if (search) {
+      data = data.filter(r =>
+        r.name.toLowerCase().includes(search.toLowerCase())
+      )
+    }
+
+    data = data.filter(r => {
+      return (
+        r.peakHour >= hourRange[0] &&
+        r.peakHour <= hourRange[1] &&
+        r.revenue >= amountRange[0] &&
+        r.revenue <= amountRange[1]
+      )
+    })
+
+    data.sort((a, b) =>
+      sortBy === "revenue"
+        ? b.revenue - a.revenue
+        : a.name.localeCompare(b.name)
+    )
+
+    return data
+  }, [search, sortBy, hourRange, amountRange])
+
+  /* ------------------ PAGINATION ------------------ */
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredRestaurants.length / PAGE_SIZE)
+  )
+
+  const paginatedData = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filteredRestaurants.slice(start, start + PAGE_SIZE)
+  }, [filteredRestaurants, page])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(1)
+  }, [page, totalPages])
+
+  /* ------------------ UI ------------------ */
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="space-y-8 p-6">
+      {/* HEADER */}
+      <div>
+        <h1 className="text-2xl font-semibold text-black">
+          Analytics Dashboard
+        </h1>
+        <p className="text-sm text-black">
+          Top restaurants ranked by revenue with advanced filters
+        </p>
+      </div>
+
+      {/* FILTERS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 bg-white border rounded-lg p-5">
+        <Filter label="Search">
+          <input
+            className="border rounded px-2 py-1 border border-gray-700 text-black"
+            placeholder="Restaurant name"
+            value={search}
+            onChange={e => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+          />
+        </Filter>
+
+        <Filter label="Sort By">
+          <select
+            className="border rounded px-2 py-1  border-gray-700 text-black"
+            value={sortBy}
+            onChange={e => {
+              setSortBy(e.target.value as any)
+              setPage(1)
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <option value="revenue">Revenue</option>
+            <option value="name">Name</option>
+          </select>
+        </Filter>
+
+        <Filter label="Peak Hour">
+          <input
+            type="range"
+            min={0}
+            max={23}
+            value={hourRange[1]}
+            onChange={e => {
+              setHourRange([0, Number(e.target.value)])
+              setPage(1)
+            }}
+          />
+          <span className="text-xs text-gray-500">
+            0:00 – {hourRange[1]}:00
+          </span>
+        </Filter>
+
+        <Filter label="Min Revenue ₹">
+          <input
+            type="number"
+            className="border rounded px-2 py-1  border-gray-700 text-black"
+            value={amountRange[0]}
+            onChange={e => {
+              setAmountRange([Number(e.target.value), amountRange[1]])
+              setPage(1)
+            }}
+          />
+        </Filter>
+
+        <Filter label="Max Revenue ₹">
+          <input
+            type="number"
+            className="border rounded px-2 py-1  border-gray-700 text-black"
+            value={amountRange[1]}
+            onChange={e => {
+              setAmountRange([amountRange[0], Number(e.target.value)])
+              setPage(1)
+            }}
+          />
+        </Filter>
+      </div>
+
+      {/* RESULTS */}
+      {paginatedData.length === 0 ? (
+        <p className="text-sm text-gray-500">No restaurants match filters.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {paginatedData.map(r => (
+            <div
+              key={r.id}
+              className="bg-white border rounded-lg p-6 shadow-sm transition-all duration-300 hover:scale-[1.03] hover:shadow-md"
+            >
+              <h4 className="font-medium text-black">{r.name}</h4>
+
+              <p className="text-emerald-600 font-semibold text-xl mt-2">
+                ₹ {r.revenue.toLocaleString()}
+              </p>
+
+              <p className="text-xs text-gray-500 mt-1">
+                Peak Hour: {r.peakHour}:00
+              </p>
+            </div>
+          ))}
         </div>
-      </main>
+      )}
+
+      {/* PAGINATION */}
+      <div className="flex justify-center items-center gap-4">
+        <button
+          disabled={page === 1}
+          onClick={() => setPage(p => p - 1)}
+          className="px-4 py-2 border rounded disabled:opacity-40"
+        >
+          Prev
+        </button>
+
+        <span className="text-sm">
+          Page {page} of {totalPages}
+        </span>
+
+        <button
+          disabled={page === totalPages}
+          onClick={() => setPage(p => p + 1)}
+          className="px-4 py-2 border rounded disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
     </div>
-  );
+  )
+}
+
+/* ------------------ FILTER WRAPPER ------------------ */
+function Filter({
+  label,
+  children
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-black">{label}</label>
+      {children}
+    </div>
+  )
 }
