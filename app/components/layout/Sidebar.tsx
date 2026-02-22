@@ -17,6 +17,9 @@ export default function Sidebar() {
         <Link href="/restaurants" className={`block ${path.startsWith("/restaurants") ? "font-bold" : ""}`}>
           Restaurants
         </Link>
+        <Link href="/orders" className={`block ${path.startsWith("/orders") ? "font-bold" : ""}`}>
+          Orders
+        </Link>
       </nav>
     </aside>
   )
